@@ -1,0 +1,471 @@
+const LOAD_EVENTS = window.hasOwnProperty('Turbo') ? ['turbo:load', 'turbo:frame-load'] : ['DOMContentLoaded'];
+
+// A generic document loaded function
+const documentLoaded = (handler) => {
+  LOAD_EVENTS.forEach((event) => {
+    document.addEventListener(event, handler);
+  });
+};
+// Tiny utilities for setting and getting cookies. Instead of using a
+// 3rd party library.
+// These enter the global scope and are included via sprockets. Less
+// than ideal, but I think it'll work.
+
+const getCookie = (name) => {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop().split(';').shift();
+}
+
+const setCookie = (name, value, options = {}) => {
+  let updatedCookie = encodeURIComponent(name) + '=' + encodeURIComponent(value);
+
+  for (let optionKey in options) {
+    updatedCookie += '; ' + optionKey;
+    let optionValue = options[optionKey];
+    if (optionValue !== true) {
+      updatedCookie += '=' + optionValue;
+    }
+  }
+
+  document.cookie = updatedCookie;
+}
+
+const setTldCookie = (name, value, options = {}) => {
+  const tld = window.location.hostname.split('.').slice(-2).join('.');
+  setCookie(name, value, { ...options, domain: tld, path: '/', samesite: 'lax' });
+};
+documentLoaded((event) => {
+  const selector = document.getElementById('content-switcher');
+  if (!selector) { return; }
+
+  const triggers = [...selector.querySelectorAll('button[data-selector-target]')];
+  const targetIds = triggers.map((trigger) => trigger.dataset.selectorTarget);
+  const targets = targetIds.map((id) => event.target.querySelector(`#${id}`));
+
+  triggers.forEach((trigger) => {
+    const targetId = trigger.dataset.selectorTarget;
+    trigger.addEventListener('click', () => {
+      targets.forEach((target) => {
+        if (target.id === targetId) {
+          target.classList.remove('hidden');
+        } else {
+          target.classList.add('hidden');
+        }
+      });
+
+      triggers.forEach((triggerForClass) => {
+        if (triggerForClass === trigger) {
+          triggerForClass.classList.add('active');
+        } else {
+          triggerForClass.classList.remove('active');
+        }
+      });
+    });
+  });
+
+  const contentSwitcher = selector;
+  const content = contentSwitcher.children[0];
+  const prevButton = document.getElementById('arrow-prev');
+  const nextButton = document.getElementById('arrow-next');
+
+  nextButton.addEventListener("click", () => {
+    const contentWidth = content.clientWidth;
+    contentSwitcher.scrollLeft += contentWidth;
+  });
+
+  prevButton.addEventListener("click", () => {
+    const contentWidth = content.clientWidth;
+    contentSwitcher.scrollLeft -= contentWidth;
+  });
+});
+window.Murakami = window.Murakami || {};
+
+documentLoaded((event) => {
+
+  (function () {
+    'use strict';
+
+    function selectInit(select) {
+      const selectNative = select.getElementsByClassName("select-native")[0];
+      const selectCustom = select.getElementsByClassName("select-custom")[0];
+      const selectCustomBox = selectCustom.children[0];
+      const selectCustomOptions = selectCustom.children[1];
+      const customOptionsList = Array.from(selectCustomOptions.children);
+      const optionsCount = customOptionsList.length;
+
+      let optionChecked = "";
+      let optionHoveredIndex = -1;
+
+      // Check the selectCustomBox for a selected selectNative option
+      const optionAlreadySelectedIndex = customOptionsList.findIndex(
+        (el) => el.getAttribute("data-value") === selectNative.value
+      );
+      if (optionAlreadySelectedIndex) {
+        let selectedOption = selectCustomOptions.children[optionAlreadySelectedIndex];
+        let selectedValue = selectedOption && selectedOption.getAttribute("data-value");
+        if(selectedOption) {
+          updateCustomSelectChecked(selectedValue, selectedOption.textContent);
+        }
+      }
+
+
+      // Disable select-native if custom-select is disabled
+      if (select.classList.contains("disabled")) {
+        selectNative.setAttribute("disabled", true);
+      }
+
+      // Toggle custom select visibility when clicking the box
+      selectCustomBox.addEventListener("click", (e) => {
+        const isClosed = !selectCustom.classList.contains("active");
+
+        if (isClosed) {
+          openSelectCustom();
+        } else {
+          closeSelectCustom();
+        }
+      });
+
+      function openSelectCustom() {
+        selectCustom.classList.add("active");
+        // Remove aria-hidden in case this was opened by a user
+        // who uses AT (e.g. Screen Reader) and a mouse at the same time.
+        selectCustom.setAttribute("aria-hidden", false);
+
+        if (optionChecked) {
+          const optionCheckedIndex = customOptionsList.findIndex(
+            (el) => el.getAttribute("data-value") === optionChecked
+          );
+          updateCustomSelectHovered(optionCheckedIndex);
+        }
+
+        // Add related event listeners
+        document.addEventListener("click", watchClickOutside);
+        document.addEventListener("keydown", supportKeyboardNavigation);
+      }
+
+      function closeSelectCustom() {
+        selectCustom.classList.remove("active");
+
+        selectCustom.setAttribute("aria-hidden", true);
+
+        updateCustomSelectHovered(-1);
+
+        // Remove related event listeners
+        document.removeEventListener("click", watchClickOutside);
+        document.removeEventListener("keydown", supportKeyboardNavigation);
+      }
+
+      function updateCustomSelectHovered(newIndex) {
+        const prevOption = selectCustomOptions.children[optionHoveredIndex];
+        const option = selectCustomOptions.children[newIndex];
+
+        if (prevOption) {
+          prevOption.classList.remove("hover");
+        }
+        if (option) {
+          option.classList.add("hover");
+        }
+
+        optionHoveredIndex = newIndex;
+      }
+
+      function updateCustomSelectChecked(value, text) {
+        const prevValue = optionChecked;
+
+        const prevOption = selectCustomOptions.querySelector(
+          `[data-value="${prevValue}"`
+        );
+        const option = selectCustomOptions.querySelector(`[data-value="${value}"`);
+
+        if (prevOption) {
+          prevOption.classList.remove("active");
+        }
+
+        if (option) {
+          option.classList.add("active");
+        }
+
+        selectCustomBox.replaceChild(document.createTextNode(text), selectCustomBox.childNodes[0]);
+        optionChecked = value;
+      }
+
+      function watchClickOutside(e) {
+        const didClickedOutside = !selectCustom.contains(e.target);
+        if (didClickedOutside) {
+          closeSelectCustom();
+        }
+      }
+
+      function supportKeyboardNavigation(e) {
+        // Press down to go next
+        if (e.keyCode === 40 && optionHoveredIndex < optionsCount - 1) {
+          let index = optionHoveredIndex;
+          e.preventDefault(); // prevent page scrolling
+          updateCustomSelectHovered(optionHoveredIndex + 1);
+        }
+
+        // Press up to go previous
+        if (e.keyCode === 38 && optionHoveredIndex > 0) {
+          e.preventDefault(); // prevent page scrolling
+          updateCustomSelectHovered(optionHoveredIndex - 1);
+        }
+
+        // Press enter or space to select the option
+        if (e.keyCode === 13 || e.keyCode === 32) {
+          e.preventDefault();
+
+          const option = selectCustomOptions.children[optionHoveredIndex];
+          const value = option && option.getAttribute("data-value");
+
+          if (value) {
+            selectNative.value = value;
+            updateCustomSelectChecked(value, option.textContent);
+          }
+          closeSelectCustom();
+        }
+
+        // Press ESC to close select-custom
+        if (e.keyCode === 27) {
+          closeSelectCustom();
+        }
+      }
+
+      // Update select-custom value when select-native is changed.
+      selectNative.addEventListener("change", (e) => {
+        const value = e.target.value;
+        const customOption = selectCustomOptions.querySelectorAll(
+          `[data-value="${value}"]`
+        )[0];
+
+        updateCustomSelectChecked(value, customOption.textContent);
+      });
+
+      // Update select-custom value when an option is clicked or hovered
+      customOptionsList.forEach(function (option, index) {
+        option.addEventListener("click", (e) => {
+          const value = e.target.getAttribute("data-value");
+
+          // Sync native select to have the same value
+          selectNative.value = value;
+          updateCustomSelectChecked(value, e.target.textContent);
+          closeSelectCustom();
+        });
+
+        option.addEventListener("mouseenter", (e) => {
+          updateCustomSelectHovered(index);
+        });
+
+        // TODO: Toggle these event listeners based on select-custom visibility
+      });
+    }
+
+    window.Murakami.loadNativeSelects = function captureAllCustomNativeSelects() {
+      const selects = document.getElementsByClassName("custom-select");
+      Array.from(selects).forEach((select) => {
+        selectInit(select);
+      }
+      );
+    }
+
+    window.Murakami.loadNativeSelects();
+  })();
+});
+documentLoaded((event) => {
+  event.target.addEventListener('click', function(e) {
+    const details = [...event.target.querySelectorAll('details[open] > details-menu')];
+    details.forEach(menu => {
+      const opened = menu.closest('details');
+      if (!opened.contains(e.target)) {
+        opened.removeAttribute('open');
+      }
+    })
+  });
+});
+documentLoaded((event) => {
+  const COOKIE_NAME = 'murakami-dismissed';
+
+  /* Utility methods */
+  const hideElement = (element) => {
+    element.classList.add('hidden');
+  };
+
+  const checkDismissed = (id) => {
+    const cookieContent = getCookie(COOKIE_NAME);
+    const ids = cookieContent ? cookieContent.split(',') : [];
+    return ids.includes(id);
+  };
+
+  const dismissElement = (element) => {
+    const id = element.dataset.murakamiDismissible;
+    if (!id || id === '') { return; }
+
+    const currentIds = getCookie(COOKIE_NAME) ? getCookie(COOKIE_NAME).split(',') : [];
+    const newIds = [...currentIds, id];
+    const uniqueIds = [...new Set(newIds)];
+    setTldCookie(COOKIE_NAME, uniqueIds.join(','), { 'max-age': 60*60*24*365*10 });
+    hideElement(element);
+  };
+
+
+  const dismissibleElements = [...event.target.querySelectorAll('[data-murakami-dismissible]')];
+  dismissibleElements.forEach((element) => {
+    const id = element.dataset.murakamiDismissible;
+
+    if (checkDismissed(id)) {
+      hideElement(element);
+    }
+
+    const buttons = [...element.querySelectorAll('[data-murakami-dismissible-button]')];
+    buttons.forEach((button) => {
+      button.addEventListener('click', () => {
+        dismissElement(element);
+      });
+    });
+  });
+});
+// This is simple script to show and hide the navigation menu on mobile
+// devices. It should really be a stimulus controller, but we haven't
+// really worked out how to share them from murakami.
+
+documentLoaded((event) => {
+  // Show/hide the menu
+  const classToToggle = 'header-container-open';
+  const containers = [...event.target.querySelectorAll('[data-mobile-nav-container')];
+  const buttons = [...event.target.querySelectorAll('[data-mobile-nav-button]')];
+  buttons.forEach((button) => {
+    button.addEventListener('click', () => {
+      containers.forEach((container) => {
+        container.classList.toggle(classToToggle);
+      });
+    });
+  });
+
+  // Expand/collapse the expandable items
+  const expandableClassToToggle = 'dropdown-expandable-expanded';
+  const expandableContainers = [...event.target.querySelectorAll('.dropdown-expandable')];
+  expandableContainers.forEach((container) => {
+    const expandableTriggers = [...container.querySelectorAll('.dropdown-line')];
+    expandableTriggers.forEach((trigger) => {
+      trigger.addEventListener('click', () => {
+        container.classList.toggle(expandableClassToToggle);
+      });
+    });
+  });
+});
+// Connects to the night mode toggle button in the header and toggles
+// the appopriate classes on the body element. It also stores the
+// current setting in a cookie so a user can retain their preference,
+// and also attempts to respect the OS night mode setting where appropriate.
+// The cookie can be 'auto', 'dark', or 'light', and is set to expire in 10 years.
+
+documentLoaded((event) => {
+  const COOKIE_NAME = 'murakami-night-mode';
+  const NIGHT_MODE_CLASS = 'prefers-color-scheme--dark';
+
+  /* Is nightmode enabled on this page? */
+  const isNightModeEnabled = document.querySelectorAll('[data-toggle-night-mode]').length > 0;
+
+  /* Utility methods */
+  const getNightModeUserPreference = () => {
+    return getCookie(COOKIE_NAME) || 'auto';
+  };
+
+  const getNightModeOSPreference = () => {
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  };
+
+  const getResolvedNightModePreference = () => {
+    const userPreference = getNightModeUserPreference();
+    if (userPreference.startsWith('auto')) {
+      const osPref = getNightModeOSPreference();
+      // Store this current OS mode in a cookie for usage on subsequent page loads
+      setTldCookie(COOKIE_NAME, `auto-${osPref}`, { 'max-age': 60*60*24*365*10 });
+      return osPref;
+    } else {
+      return userPreference;
+    }
+  };
+
+  // Update the cookie with the new preference
+  const toggleNightModeUserPreference = () => {
+    const currentPreference = getResolvedNightModePreference();
+    const newPreference = currentPreference === 'dark' ? 'light' : 'dark';
+    setTldCookie(COOKIE_NAME, newPreference, { 'max-age': 60*60*24*365*10 });
+  };
+
+  // Add an 'active' class to the buttons that represent the current mode
+  const updateNightModeSetButtons = () => {
+    const preference = getNightModeUserPreference();
+    const nightModeSetButtons = event.target.querySelectorAll('[data-set-night-mode]');
+    nightModeSetButtons.forEach((button) => {
+      button.classList.toggle('active', button.dataset.setNightMode === preference);
+    });
+  };
+
+  // If there are any toggle buttons then they might have descriptive text that reflects
+  // the current state. Let's use that to update them.
+  const updateNightModeToggleDescriptions = () => {
+    const preference = getResolvedNightModePreference();
+    const nightModeDescriptions = event.target.querySelectorAll(`[data-night-mode-description-${preference}]`);
+    nightModeDescriptions.forEach((description) => {
+      const capitalisedPreference = preference.charAt(0).toUpperCase() + preference.slice(1);
+      description.innerText = description.dataset[`nightModeDescription${capitalisedPreference}`];
+    });
+  };
+
+
+  // Actually apply the night mode preference to the page
+  const applyNightModePreference = () => {
+    if (!isNightModeEnabled) return;
+
+    const preference = getResolvedNightModePreference();
+    document.body.classList.toggle(NIGHT_MODE_CLASS, preference === 'dark');
+    updateNightModeSetButtons();
+    updateNightModeToggleDescriptions();
+  };
+
+  /* EVENT HANDLING */
+  // Handle night-mode toggle buttons
+  const nightModeToggleButtons = event.target.querySelectorAll('[data-toggle-night-mode]');
+  nightModeToggleButtons.forEach((button) => {
+    button.addEventListener('click', (e) => {
+      e.preventDefault();
+      toggleNightModeUserPreference();
+      applyNightModePreference();
+    });
+  });
+
+  // Handle night mode explicit control buttons
+  const nightModeControlButtons = event.target.querySelectorAll('[data-set-night-mode]');
+  nightModeControlButtons.forEach((button) => {
+    button.addEventListener('click', (e) => {
+      e.preventDefault();
+      const preference = button.dataset.setNightMode;
+      setTldCookie(COOKIE_NAME, preference, { 'max-age': 60*60*24*365*10 });
+      applyNightModePreference();
+    });
+  });
+
+  // Handle OS night mode changes
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+    applyNightModePreference();
+  });
+
+  /* INITIAL PAGE LOAD */
+  applyNightModePreference();
+});
+documentLoaded((event) => {
+  [...event.target.querySelectorAll("input[type='search']+svg[role='clear']")].forEach((el) => {
+    el.addEventListener('click', (e) => {
+      if (e.target.previousElementSibling && e.target.previousElementSibling.tagName === 'INPUT') {
+        e.target.previousElementSibling.value = '';
+      } else if (e.target.parentElement.previousElementSibling && e.target.parentElement.previousElementSibling.tagName === 'INPUT') {
+        e.target.parentElement.previousElementSibling.value = '';
+      }
+    });
+  });
+});
+
+
+
