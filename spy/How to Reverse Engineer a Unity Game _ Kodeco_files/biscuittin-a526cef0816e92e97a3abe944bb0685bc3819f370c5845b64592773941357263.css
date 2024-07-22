@@ -1,9 +1,0 @@
-/* relative-medium */
-@font-face {
-  font-family: "Relative";
-  font-style: normal;
-  font-weight: 500;
-  src: url(https://cdn.kodeco.com/v3-resources/guardpost/production/packs/media/fonts/relative-medium-pro-efff202b230c17039474726cd59259a03b75292b1a63068ab73f55dbf6a25dcb.woff2) format("woff2"), url(https://cdn.kodeco.com/v3-resources/guardpost/production/packs/media/fonts/relative-medium-pro-16f66e32ff5195a3e52ad1f851b3559c20d2fb56508ed215cf319f2a59cf7abf.woff) format("woff"); /* Chrome 6+, Firefox 3.6+, IE 9+, Safari 5.1+ */
-}
-
-/*# sourceMappingURL=biscuittin.css.map */
